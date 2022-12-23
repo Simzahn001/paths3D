@@ -24,6 +24,7 @@ By default the pathfinding only can go 1 [height unit] up per cell. And can drop
 | **Height Pathfinding**<br>The basic thing of the fork                                   | In Development |
 | **Drop Heights**<br>Make the height that can be dropped <br>down on a path configurable |     Planned    |
 | **Step Hights**<br>Make the hight that can be steped<br>up at once configurable         |     Planned    |
+| **Heightmap**<br>A string visualisation of the cell's height levels                     |     Planned    |
 
 ## Why did you create paths?
 
