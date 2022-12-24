@@ -12,17 +12,17 @@ import (
 )
 
 // A Cell represents a point on a Grid map. It has an X and Y value for the position, a Cost, which influences which Cells are
-// ideal for paths, Walkable, which indicates if the tile can be walked on or should be avoided, and a Rune, which indicates
-// which rune character the Cell is represented by.
+// ideal for paths, Walkable, which indicates if the tile can be walked on or should be avoided, a Rune, which indicates
+// which rune character the Cell is represented by, and a HeightLevel, which represents the height of this cell
 type Cell struct {
-	X, Y     int
-	Cost     float64
-	Walkable bool
-	Rune     rune
+	X, Y, HeightLevel int
+	Cost              float64
+	Walkable          bool
+	Rune              rune
 }
 
 func (cell Cell) String() string {
-	return fmt.Sprintf("X:%d Y:%d Cost:%f Walkable:%t Rune:%s(%d)", cell.X, cell.Y, cell.Cost, cell.Walkable, string(cell.Rune), int(cell.Rune))
+	return fmt.Sprintf("X:%d Y:%d Height:%d Cost:%f Walkable:%t Rune:%s(%d)", cell.X, cell.Y, cell.HeightLevel, cell.Cost, cell.Walkable, string(cell.Rune), int(cell.Rune))
 }
 
 // Grid represents a "map" composed of individual Cells at each point in the map.
@@ -35,7 +35,8 @@ type Grid struct {
 
 // NewGrid returns a new Grid of (gridWidth x gridHeight) size. cellWidth and cellHeight changes the size of each Cell in the Grid.
 // This is used to translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world positon [32, 80]).
+// [16, 16] would be the world position [32, 80]).
+// @TODO look at
 func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -43,7 +44,14 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 	for y := 0; y < gridHeight; y++ {
 		m.Data = append(m.Data, []*Cell{})
 		for x := 0; x < gridWidth; x++ {
-			m.Data[y] = append(m.Data[y], &Cell{x, y, 1, true, ' '})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        ' ',
+			})
 		}
 	}
 	return m
@@ -53,6 +61,7 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 // with one rune as its character. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to
 // translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
 // [16, 16] would be the world positon [32, 80]).
+// To add height levels, look at: AddHeightProfile()
 func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -61,7 +70,14 @@ func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 		m.Data = append(m.Data, []*Cell{})
 		stringLine := []rune(arrays[y])
 		for x := 0; x < len(arrays[y]); x++ {
-			m.Data[y] = append(m.Data[y], &Cell{X: x, Y: y, Cost: 1, Walkable: true, Rune: stringLine[x]})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        stringLine[x],
+			})
 		}
 	}
 
@@ -71,7 +87,8 @@ func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 // NewGridFromRuneArrays creates a Grid map from a 2D array of runes. Each individual Rune becomes a Cell in the resulting
 // Grid. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to translate world position to Cell
-// positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of [16, 16] would be the world positon [32, 80]).
+// positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of [16, 16] would be the world position [32, 80]).
+// To add height levels, look at: AddHeightProfile()
 func NewGridFromRuneArrays(arrays [][]rune, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -79,11 +96,36 @@ func NewGridFromRuneArrays(arrays [][]rune, cellWidth, cellHeight int) *Grid {
 	for y := 0; y < len(arrays); y++ {
 		m.Data = append(m.Data, []*Cell{})
 		for x := 0; x < len(arrays[y]); x++ {
-			m.Data[y] = append(m.Data[y], &Cell{X: x, Y: y, Cost: 1, Walkable: true, Rune: arrays[y][x]})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        arrays[y][x],
+			})
 		}
 	}
 
 	return m
+
+}
+
+// AddHeightProfile adds a height to the grid via a key-value map. All runes, the map contains, do have an assigned height.
+// This height is applied to ALL cells with this rune. After the execution of this method, letters aren't bound to the height;
+// they are no pointers. If you change a letter, the height will stay the same.
+// Keep in mind, that cell runes are case-sensitive.
+func (m *Grid) AddHeightProfile(profile map[rune]int) {
+	//@TODO better naming of method and parameter
+
+	//loop trough all cells
+	for _, cell := range m.AllCells() {
+		//check if the map contains the rune of the cell
+		heightLevel, exists := profile[cell.Rune]
+		if exists {
+			cell.HeightLevel = heightLevel
+		}
+	}
 
 }
 
@@ -98,6 +140,8 @@ func (m *Grid) DataToString() string {
 	}
 	return s
 }
+
+//@TODO heightmap visualisation
 
 // Get returns a pointer to the Cell in the x and y position provided.
 func (m *Grid) Get(x, y int) *Cell {
@@ -116,6 +160,8 @@ func (m *Grid) Height() int {
 func (m *Grid) Width() int {
 	return len(m.Data[0])
 }
+
+//@TODO add getAverageHeight, getMaxHeight, getMinHeight
 
 // CellsByRune returns a slice of pointers to Cells that all have the character provided.
 func (m *Grid) CellsByRune(char rune) []*Cell {
@@ -437,7 +483,7 @@ type Path struct {
 	CurrentIndex int
 }
 
-// TotalCost returns the total cost of the Path (i.e. is the sum of all of the Cells in the Path).
+// TotalCost returns the total cost of the Path (i.e. is the sum of all the Cells in the Path).
 func (p *Path) TotalCost() float64 {
 
 	cost := 0.0
