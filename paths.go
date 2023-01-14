@@ -7,13 +7,16 @@ package paths
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 )
 
 // A Cell represents a point on a Grid map. It has an X and Y value for the position, a Cost, which influences which Cells are
 // ideal for paths, Walkable, which indicates if the tile can be walked on or should be avoided, a Rune, which indicates
-// which rune character the Cell is represented by, and a HeightLevel, which represents the height of this cell
+// which rune character the Cell is represented by, and a HeightLevel (default: 0), which represents the height of this cell.
 type Cell struct {
 	X, Y, HeightLevel int
 	Cost              float64
@@ -141,7 +144,54 @@ func (m *Grid) DataToString() string {
 	return s
 }
 
-//@TODO heightmap visualisation
+// Visualise return a string visualisation of the grid's cell heights.
+// Not walkable blocks are represented by a blank space.
+// An error is returned if there are more than 26 height levels. The heightmap is filled though,
+// but every layer after the 26th is still visualised with the letter 'z'
+func (m *Grid) Visualise() (visualisation []string, error error) {
+
+	//check if more than 26 different height levels are contained.
+	//If so, the visualisation is kinda buggy, because heights bigger than 26 will be
+	//displayed with the same character.
+	heights := m.GetHeightLevels()
+	if len(m.GetHeightLevels()) > 26 {
+		error = errors.New("there are more than 26 height levels. All levels after the 26th will not be displayed correctly")
+	}
+
+	//sort array
+	sort.Ints(heights)
+
+	//creating a map with all height levels and letters
+	letters := make(map[int]rune)
+	ascii := 97
+	for _, height := range heights {
+		letters[height] = rune(ascii)
+		ascii++
+		if ascii > 122 {
+			ascii = 121
+		}
+	}
+
+	//create the strings
+	visualisation = []string{}
+	for y := 0; y < m.Height(); y++ {
+		var currentString = strings.Builder{}
+		for x := 0; x < m.Width(); x++ {
+			cell := m.Get(x, y)
+
+			//non-walkable cells should be represented my a blank space
+			if !cell.Walkable {
+				currentString.WriteString(" ")
+			} else {
+				currentString.WriteString(string(letters[cell.HeightLevel]))
+			}
+
+		}
+		visualisation = append(visualisation, currentString.String())
+	}
+
+	return visualisation, error
+}
 
 // Get returns a pointer to the Cell in the x and y position provided.
 func (m *Grid) Get(x, y int) *Cell {
@@ -162,6 +212,22 @@ func (m *Grid) Width() int {
 }
 
 //@TODO add getAverageHeight, getMaxHeight, getMinHeight
+
+// GetHeightLevels returns a list of all different height levels.
+// use len() on the returned slice to get the amount of different height levels
+func (m *Grid) GetHeightLevels() []int {
+
+	var heightLevels = []int{}
+
+	for _, cell := range m.AllCells() {
+		//if height of the current cell is not yet contained
+		if !containesInt(heightLevels, cell.HeightLevel) {
+			heightLevels = append(heightLevels, cell.HeightLevel)
+		}
+	}
+
+	return heightLevels
+}
 
 // CellsByRune returns a slice of pointers to Cells that all have the character provided.
 func (m *Grid) CellsByRune(char rune) []*Cell {
@@ -637,4 +703,15 @@ func (mH *minHeap) Pop() interface{} {
 
 func (mH *minHeap) Push(x interface{}) {
 	*mH = append(*mH, x.(*Node))
+}
+
+// check if a int is contained in a array
+// bc go has no build in function for this
+func containesInt(array []int, i int) bool {
+	for _, current := range array {
+		if current == i {
+			return true
+		}
+	}
+	return false
 }
