@@ -1,7 +1,7 @@
 /*
 Package paths is a simple library written in Go made to handle 2D pathfinding for games. All you need to do is generate a Grid,
 specify which cells aren't walkable, optionally change the cost on specific cells, and finally get a path from one cell to
-another.
+another. @TODO update this paragraph
 */
 package paths
 
@@ -191,6 +191,20 @@ func (m *Grid) Visualise() (visualisation []string, error error) {
 	}
 
 	return visualisation, error
+}
+
+func (m *Grid) VisualisePath(path *Path) []string {
+	//get the grid as string
+	visualisation, _ := m.Visualise()
+
+	//go through each cell of the path and set the cell to the letter '#'
+	for _, cell := range path.Cells {
+		rowAsRuneArray := []rune(visualisation[cell.Y])
+		rowAsRuneArray[cell.X] = '#'
+		visualisation[cell.Y] = string(rowAsRuneArray)
+	}
+
+	return visualisation
 }
 
 // Get returns a pointer to the Cell in the x and y position provided.
