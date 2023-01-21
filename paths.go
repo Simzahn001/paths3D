@@ -8,7 +8,6 @@ package paths
 import (
 	"container/heap"
 	"fmt"
-	"math"
 )
 
 // A Cell represents a point on a Grid map. It has an X and Y value for the position, a Cost, which influences which Cells are
@@ -29,16 +28,13 @@ func (cell Cell) String() string {
 // Data is a 2D array of Cells.
 // CellWidth and CellHeight indicate the size of Cells for Cell Position <-> World Position translation.
 type Grid struct {
-	Data                  [][]*Cell
-	CellWidth, CellHeight int
+	Data [][]*Cell
 }
 
-// NewGrid returns a new Grid of (gridWidth x gridHeight) size. cellWidth and cellHeight changes the size of each Cell in the Grid.
-// This is used to translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world positon [32, 80]).
-func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
+// NewGrid returns a new Grid of (gridWidth x gridHeight) size.
+func NewGrid(gridWidth, gridHeight int) *Grid {
 
-	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
+	m := &Grid{}
 
 	for y := 0; y < gridHeight; y++ {
 		m.Data = append(m.Data, []*Cell{})
@@ -50,12 +46,10 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 }
 
 // NewGridFromStringArrays creates a Grid map from a 1D array of strings. Each string becomes a row of Cells, each
-// with one rune as its character. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to
-// translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world positon [32, 80]).
-func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
+// with one rune as its character.
+func NewGridFromStringArrays(arrays []string) *Grid {
 
-	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
+	m := &Grid{}
 
 	for y := 0; y < len(arrays); y++ {
 		m.Data = append(m.Data, []*Cell{})
@@ -69,12 +63,10 @@ func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 }
 
-// NewGridFromRuneArrays creates a Grid map from a 2D array of runes. Each individual Rune becomes a Cell in the resulting
-// Grid. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to translate world position to Cell
-// positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of [16, 16] would be the world positon [32, 80]).
-func NewGridFromRuneArrays(arrays [][]rune, cellWidth, cellHeight int) *Grid {
+// NewGridFromRuneArrays creates a Grid map from a 2D array of runes. Each individual Rune becomes a Cell in the resulting Grid.
+func NewGridFromRuneArrays(arrays [][]rune) *Grid {
 
-	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
+	m := &Grid{}
 
 	for y := 0; y < len(arrays); y++ {
 		m.Data = append(m.Data, []*Cell{})
@@ -226,20 +218,6 @@ func (m *Grid) SetCost(char rune, cost float64) {
 
 }
 
-// GridToWorld converts from a grid position to world position, multiplying the value by the CellWidth and CellHeight of the Grid.
-func (m *Grid) GridToWorld(x, y int) (float64, float64) {
-	rx := float64(x * m.CellWidth)
-	ry := float64(y * m.CellHeight)
-	return rx, ry
-}
-
-// WorldToGrid converts from a grid position to world position, multiplying the value by the CellWidth and CellHeight of the Grid.
-func (m *Grid) WorldToGrid(x, y float64) (int, int) {
-	tx := int(math.Floor(x / float64(m.CellWidth)))
-	ty := int(math.Floor(y / float64(m.CellHeight)))
-	return tx, ty
-}
-
 // GetPathFromCells returns a Path, from the starting Cell to the destination Cell. diagonals controls whether moving diagonally
 // is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls that are
 // positioned diagonally.
@@ -382,15 +360,13 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 
 }
 
-// GetPath returns a Path, from the starting world X and Y position to the ending X and Y position. diagonals controls whether
+// GetPath returns a Path, from the starting cell's X and Y to the ending cell's X and Y. diagonals controls whether
 // moving diagonally is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls
 // that are positioned diagonally. This is essentially just a smoother way to get a Path from GetPathFromCells().
 func (m *Grid) GetPath(startX, startY, endX, endY float64, diagonals bool, wallsBlockDiagonals bool) *Path {
 
-	sx, sy := m.WorldToGrid(startX, startY)
-	sc := m.Get(sx, sy)
-	ex, ey := m.WorldToGrid(endX, endY)
-	ec := m.Get(ex, ey)
+	sc := m.Get(int(startX), int(startY))
+	ec := m.Get(int(endX), int(endY))
 
 	if sc != nil && ec != nil {
 		return m.GetPathFromCells(sc, ec, diagonals, wallsBlockDiagonals)
@@ -558,13 +534,13 @@ func (p *Path) SetIndex(index int) {
 
 }
 
-// AtStart returns if the Path's current index is 0, the first Cell in the Path.
-func (p *Path) AtStart() bool {
+// IsAtStart returns if the Path's current index is 0, the first Cell in the Path.
+func (p *Path) IsAtStart() bool {
 	return p.CurrentIndex == 0
 }
 
-// AtEnd returns if the Path's current index is the last Cell in the Path.
-func (p *Path) AtEnd() bool {
+// IsAtEnd returns if the Path's current index is the last Cell in the Path.
+func (p *Path) IsAtEnd() bool {
 	return p.CurrentIndex >= len(p.Cells)-1
 }
 
