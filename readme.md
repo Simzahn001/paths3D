@@ -13,11 +13,11 @@ By default, the pathfinding only can go 1 height unit up per cell. And can drop 
 Configuration is planned ;) 
 
 ## Fork Status
-| Feature                                                                               |     State      |
-|---------------------------------------------------------------------------------------|:--------------:|
-| **Height Pathfinding**<br>The basic height be dropped <br>down on a path configurable | In Development |
-| **Step Heights**<br>Make the height that can be stepped up configurable               |    Planned     |
-| **Drop Heights**<br>Make the height that  stepped<br>up at once configurable          |    Planned     |
+| Feature                                                                               |     State       |
+|---------------------------------------------------------------------------------------|:---------------:|
+| **Height Pathfinding**<br>The basic height be dropped <br>down on a path configurable |    Finished     |
+| **Step Heights**<br>Make the height that can be stepped up configurable               |    Finished     |
+| **Drop Heights**<br>Make the height that  stepped<br>up at once configurable          |    Planned      |
 
 
 ## Why did you create paths3D?
