@@ -19,6 +19,7 @@ Configuration is planned ;)
 | **Step Heights**<br>Make the height that can be stepped up configurable               |    Planned     |
 | **Drop Heights**<br>Make the height that  stepped<br>up at once configurable          |    Planned     |
 
+
 ## Why did you create paths3D?
 
 I was doing day 12 of the [AoC](https://adventofcode.com/2022/day/12) and was wondering if there is a simple 
