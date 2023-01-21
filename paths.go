@@ -1,28 +1,31 @@
 /*
 Package paths is a simple library written in Go made to handle 2D pathfinding for games. All you need to do is generate a Grid,
 specify which cells aren't walkable, optionally change the cost on specific cells, and finally get a path from one cell to
-another.
+another. @TODO update this paragraph
 */
 package paths
 
 import (
 	"container/heap"
+	"errors"
 	"fmt"
 	"math"
+	"sort"
+	"strings"
 )
 
 // A Cell represents a point on a Grid map. It has an X and Y value for the position, a Cost, which influences which Cells are
-// ideal for paths, Walkable, which indicates if the tile can be walked on or should be avoided, and a Rune, which indicates
-// which rune character the Cell is represented by.
+// ideal for paths, Walkable, which indicates if the tile can be walked on or should be avoided, a Rune, which indicates
+// which rune character the Cell is represented by, and a HeightLevel (default: 0), which represents the height of this cell.
 type Cell struct {
-	X, Y     int
-	Cost     float64
-	Walkable bool
-	Rune     rune
+	X, Y, HeightLevel int
+	Cost              float64
+	Walkable          bool
+	Rune              rune
 }
 
 func (cell Cell) String() string {
-	return fmt.Sprintf("X:%d Y:%d Cost:%f Walkable:%t Rune:%s(%d)", cell.X, cell.Y, cell.Cost, cell.Walkable, string(cell.Rune), int(cell.Rune))
+	return fmt.Sprintf("X:%d Y:%d Height:%d Cost:%f Walkable:%t Rune:%s(%d)", cell.X, cell.Y, cell.HeightLevel, cell.Cost, cell.Walkable, string(cell.Rune), int(cell.Rune))
 }
 
 // Grid represents a "map" composed of individual Cells at each point in the map.
@@ -35,7 +38,8 @@ type Grid struct {
 
 // NewGrid returns a new Grid of (gridWidth x gridHeight) size. cellWidth and cellHeight changes the size of each Cell in the Grid.
 // This is used to translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world positon [32, 80]).
+// [16, 16] would be the world position [32, 80]).
+// @TODO look at
 func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -43,7 +47,14 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 	for y := 0; y < gridHeight; y++ {
 		m.Data = append(m.Data, []*Cell{})
 		for x := 0; x < gridWidth; x++ {
-			m.Data[y] = append(m.Data[y], &Cell{x, y, 1, true, ' '})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        ' ',
+			})
 		}
 	}
 	return m
@@ -53,6 +64,7 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 // with one rune as its character. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to
 // translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
 // [16, 16] would be the world positon [32, 80]).
+// To add height levels, look at: AddHeightMap()
 func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -61,7 +73,14 @@ func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 		m.Data = append(m.Data, []*Cell{})
 		stringLine := []rune(arrays[y])
 		for x := 0; x < len(arrays[y]); x++ {
-			m.Data[y] = append(m.Data[y], &Cell{X: x, Y: y, Cost: 1, Walkable: true, Rune: stringLine[x]})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        stringLine[x],
+			})
 		}
 	}
 
@@ -71,7 +90,8 @@ func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 // NewGridFromRuneArrays creates a Grid map from a 2D array of runes. Each individual Rune becomes a Cell in the resulting
 // Grid. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to translate world position to Cell
-// positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of [16, 16] would be the world positon [32, 80]).
+// positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of [16, 16] would be the world position [32, 80]).
+// To add height levels, look at: AddHeightMap()
 func NewGridFromRuneArrays(arrays [][]rune, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -79,11 +99,35 @@ func NewGridFromRuneArrays(arrays [][]rune, cellWidth, cellHeight int) *Grid {
 	for y := 0; y < len(arrays); y++ {
 		m.Data = append(m.Data, []*Cell{})
 		for x := 0; x < len(arrays[y]); x++ {
-			m.Data[y] = append(m.Data[y], &Cell{X: x, Y: y, Cost: 1, Walkable: true, Rune: arrays[y][x]})
+			m.Data[y] = append(m.Data[y], &Cell{
+				X:           x,
+				Y:           y,
+				HeightLevel: 0,
+				Cost:        1,
+				Walkable:    true,
+				Rune:        arrays[y][x],
+			})
 		}
 	}
 
 	return m
+
+}
+
+// AddHeightMap adds a height to the grid via a key-value map. All runes, the map contains, do have an assigned height.
+// This height is applied to ALL cells with this rune. After the execution of this method, letters aren't bound to the height;
+// they are no pointers. If you change a letter, the height will stay the same.
+// Keep in mind, that cell runes are case-sensitive.
+func (m *Grid) AddHeightMap(profile map[rune]int) {
+
+	//loop trough all cells
+	for _, cell := range m.AllCells() {
+		//check if the map contains the rune of the cell
+		heightLevel, exists := profile[cell.Rune]
+		if exists {
+			cell.HeightLevel = heightLevel
+		}
+	}
 
 }
 
@@ -97,6 +141,74 @@ func (m *Grid) DataToString() string {
 		s += "\n"
 	}
 	return s
+}
+
+// Visualise return a string visualisation of the grid's cell heights.
+// Not walkable blocks are represented by a blank space.
+// An error is returned if there are more than 26 height levels. The heightmap is filled though,
+// but every layer after the 26th is still visualised with the letter 'z'
+func (m *Grid) Visualise() (visualisation []string, error error) {
+
+	//check if more than 26 different height levels are contained.
+	//If so, the visualisation is kinda buggy, because heights bigger than 26 will be
+	//displayed with the same character.
+	heights := m.GetHeightLevels()
+	if len(m.GetHeightLevels()) > 26 {
+		error = errors.New("there are more than 26 height levels. All levels after the 26th will not be displayed correctly")
+	}
+
+	//sort array
+	sort.Ints(heights)
+
+	//creating a map with all height levels and letters
+	letters := make(map[int]rune)
+	ascii := 97
+	for _, height := range heights {
+		letters[height] = rune(ascii)
+		ascii++
+		if ascii > 122 {
+			ascii = 121
+		}
+	}
+
+	//create the strings
+	visualisation = []string{}
+	for y := 0; y < m.Height(); y++ {
+		var currentString = strings.Builder{}
+		for x := 0; x < m.Width(); x++ {
+			cell := m.Get(x, y)
+
+			//non-walkable cells should be represented my a blank space
+			if !cell.Walkable {
+				currentString.WriteString(" ")
+			} else {
+				currentString.WriteString(string(letters[cell.HeightLevel]))
+			}
+
+		}
+		visualisation = append(visualisation, currentString.String())
+	}
+
+	return visualisation, error
+}
+
+func (m *Grid) VisualisePath(path *Path) []string {
+	//check if path is nil
+	if path == nil {
+		return nil
+	}
+
+	//get the grid as string
+	visualisation, _ := m.Visualise()
+
+	//go through each cell of the path and set the cell to the letter '#'
+	for _, cell := range path.Cells {
+		rowAsRuneArray := []rune(visualisation[cell.Y])
+		rowAsRuneArray[cell.X] = '#'
+		visualisation[cell.Y] = string(rowAsRuneArray)
+	}
+
+	return visualisation
 }
 
 // Get returns a pointer to the Cell in the x and y position provided.
@@ -115,6 +227,24 @@ func (m *Grid) Height() int {
 // Width returns the width of the Grid map.
 func (m *Grid) Width() int {
 	return len(m.Data[0])
+}
+
+//@TODO add getAverageHeight, getMaxHeight, getMinHeight
+
+// GetHeightLevels returns a list of all different height levels.
+// use len() on the returned slice to get the amount of different height levels
+func (m *Grid) GetHeightLevels() []int {
+
+	var heightLevels = []int{}
+
+	for _, cell := range m.AllCells() {
+		//if height of the current cell is not yet contained
+		if !containesInt(heightLevels, cell.HeightLevel) {
+			heightLevels = append(heightLevels, cell.HeightLevel)
+		}
+	}
+
+	return heightLevels
 }
 
 // CellsByRune returns a slice of pointers to Cells that all have the character provided.
@@ -243,7 +373,7 @@ func (m *Grid) WorldToGrid(x, y float64) (int, int) {
 // GetPathFromCells returns a Path, from the starting Cell to the destination Cell. diagonals controls whether moving diagonally
 // is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls that are
 // positioned diagonally.
-func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonals bool) *Path {
+func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wallsBlockDiagonals bool) *Path {
 
 	openNodes := minHeap{}
 	heap.Push(&openNodes, &Node{Cell: dest, Cost: dest.Cost})
@@ -261,7 +391,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 
 	}
 
-	path := &Path{}
+	path := &Path{StepHeight: stepHeight}
 
 	if !start.Walkable || !dest.Walkable {
 		return nil
@@ -297,7 +427,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 		if node.Cell.X > 0 {
 			c := m.Get(node.Cell.X-1, node.Cell.Y)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) {
+			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -305,7 +435,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 		if node.Cell.X < m.Width()-1 {
 			c := m.Get(node.Cell.X+1, node.Cell.Y)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) {
+			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -314,7 +444,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 		if node.Cell.Y > 0 {
 			c := m.Get(node.Cell.X, node.Cell.Y-1)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) {
+			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -322,7 +452,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 		if node.Cell.Y < m.Height()-1 {
 			c := m.Get(node.Cell.X, node.Cell.Y+1)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) {
+			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -341,7 +471,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 			if node.Cell.X > 0 && node.Cell.Y > 0 {
 				c := m.Get(node.Cell.X-1, node.Cell.Y-1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && up)) {
+				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && up)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -350,7 +480,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 			if node.Cell.X < m.Width()-1 && node.Cell.Y > 0 {
 				c := m.Get(node.Cell.X+1, node.Cell.Y-1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && up)) {
+				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && up)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -359,7 +489,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 			if node.Cell.X > 0 && node.Cell.Y < m.Height()-1 {
 				c := m.Get(node.Cell.X-1, node.Cell.Y+1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && down)) {
+				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && down)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -368,7 +498,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 			if node.Cell.X < m.Width()-1 && node.Cell.Y < m.Height()-1 {
 				c := m.Get(node.Cell.X+1, node.Cell.Y+1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && down)) {
+				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && down)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -385,7 +515,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, diagonals, wallsBlockDiagonal
 // GetPath returns a Path, from the starting world X and Y position to the ending X and Y position. diagonals controls whether
 // moving diagonally is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls
 // that are positioned diagonally. This is essentially just a smoother way to get a Path from GetPathFromCells().
-func (m *Grid) GetPath(startX, startY, endX, endY float64, diagonals bool, wallsBlockDiagonals bool) *Path {
+func (m *Grid) GetPath(startX, startY, endX, endY float64, stepHeight int, diagonals bool, wallsBlockDiagonals bool) *Path {
 
 	sx, sy := m.WorldToGrid(startX, startY)
 	sc := m.Get(sx, sy)
@@ -393,7 +523,7 @@ func (m *Grid) GetPath(startX, startY, endX, endY float64, diagonals bool, walls
 	ec := m.Get(ex, ey)
 
 	if sc != nil && ec != nil {
-		return m.GetPathFromCells(sc, ec, diagonals, wallsBlockDiagonals)
+		return m.GetPathFromCells(sc, ec, stepHeight, diagonals, wallsBlockDiagonals)
 	}
 	return nil
 }
@@ -433,11 +563,11 @@ func (m *Grid) DataAsRuneArrays() [][]rune {
 // A Path is a struct that represents a path, or sequence of Cells from point A to point B. The Cells list is the list of Cells contained in the Path,
 // and the CurrentIndex value represents the current step on the Path. Using Path.Next() and Path.Prev() advances and walks back the Path by one step.
 type Path struct {
-	Cells        []*Cell
-	CurrentIndex int
+	Cells                    []*Cell
+	CurrentIndex, StepHeight int
 }
 
-// TotalCost returns the total cost of the Path (i.e. is the sum of all of the Cells in the Path).
+// TotalCost returns the total cost of the Path (i.e. is the sum of all the Cells in the Path).
 func (p *Path) TotalCost() float64 {
 
 	cost := 0.0
@@ -591,4 +721,15 @@ func (mH *minHeap) Pop() interface{} {
 
 func (mH *minHeap) Push(x interface{}) {
 	*mH = append(*mH, x.(*Node))
+}
+
+// check if a int is contained in a array
+// bc go has no build in function for this
+func containesInt(array []int, i int) bool {
+	for _, current := range array {
+		if current == i {
+			return true
+		}
+	}
+	return false
 }
