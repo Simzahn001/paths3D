@@ -1,7 +1,7 @@
 /*
-Package paths is a simple library written in Go made to handle 2D pathfinding for games. All you need to do is generate a Grid,
-specify which cells aren't walkable, optionally change the cost on specific cells, and finally get a path from one cell to
-another. @TODO update this paragraph
+Package paths3D is a simple library written in Go made to handle 3D pathfinding. All you need to do is generate a Grid,
+specify which cells aren't walkable and what height the cells are, optionally change the cost on specific cells, and
+finally get a path from one cell to another. For a simple guide, take a look at how-to.md in the github repo: https://github.com/Simzahn001/paths3D
 */
 package paths
 
@@ -38,8 +38,7 @@ type Grid struct {
 
 // NewGrid returns a new Grid of (gridWidth x gridHeight) size. cellWidth and cellHeight changes the size of each Cell in the Grid.
 // This is used to translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world position [32, 80]).
-// @TODO look at
+// [16, 16] would be the world position [32, 80]). To add height to the grid, use AddHeightMap() or SetHeightLevel().
 func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -63,8 +62,7 @@ func NewGrid(gridWidth, gridHeight, cellWidth, cellHeight int) *Grid {
 // NewGridFromStringArrays creates a Grid map from a 1D array of strings. Each string becomes a row of Cells, each
 // with one rune as its character. cellWidth and cellHeight changes the size of each Cell in the Grid. This is used to
 // translate world position to Cell positions (i.e. the Cell position [2, 5] with a CellWidth and CellHeight of
-// [16, 16] would be the world positon [32, 80]).
-// To add height levels, look at: AddHeightMap()
+// [16, 16] would be the world positon [32, 80]). To add height levels, look at: AddHeightMap() or SetHeightLevel()
 func NewGridFromStringArrays(arrays []string, cellWidth, cellHeight int) *Grid {
 
 	m := &Grid{CellWidth: cellWidth, CellHeight: cellHeight}
@@ -229,7 +227,48 @@ func (m *Grid) Width() int {
 	return len(m.Data[0])
 }
 
-//@TODO add getAverageHeight, getMaxHeight, getMinHeight
+// GetAverageHeight returns the average height over all the Grid. Use math.Round to get an int
+func (m *Grid) GetAverageHeight() float64 {
+
+	sum := 0
+	i := 1
+
+	for _, cell := range m.AllCells() {
+		sum += cell.HeightLevel
+		i++
+	}
+
+	return float64(sum) / float64(i)
+
+}
+
+// GetMaxHeight returns the maximum height of the whole Grid
+func (m *Grid) GetMaxHeight() int {
+
+	var maxHeight = math.MinInt
+
+	for _, cell := range m.AllCells() {
+		if cell.HeightLevel > maxHeight {
+			maxHeight = cell.HeightLevel
+		}
+	}
+
+	return maxHeight
+}
+
+// GetMinHeight returns the minimum height of the whole Grid
+func (m *Grid) GetMinHeight() int {
+
+	var maxHeight = math.MaxInt
+
+	for _, cell := range m.AllCells() {
+		if cell.HeightLevel < maxHeight {
+			maxHeight = cell.HeightLevel
+		}
+	}
+
+	return maxHeight
+}
 
 // GetHeightLevels returns a list of all different height levels.
 // use len() on the returned slice to get the amount of different height levels
@@ -324,6 +363,17 @@ func (m *Grid) CellsByWalkable(walkable bool) []*Cell {
 
 }
 
+// CellsByHeightLevel returns a slice of pointers to Cells that all have the height level provided.
+func (m *Grid) CellsByHeightLevel(heightLevel int) []*Cell {
+	cells := make([]*Cell, 1)
+
+	for _, cell := range m.AllCells() {
+		cells = append(cells, cell)
+	}
+
+	return cells
+}
+
 // SetWalkable sets walkability across all cells in the Grid with the specified rune.
 func (m *Grid) SetWalkable(char rune, walkable bool) {
 
@@ -336,6 +386,17 @@ func (m *Grid) SetWalkable(char rune, walkable bool) {
 			}
 		}
 
+	}
+
+}
+
+// SetHeightLevel sets the height level for all cells in the Grid with the specified rune.
+func (m *Grid) SetHeightLevel(char rune, heightLevel int) {
+
+	for _, cell := range m.AllCells() {
+		if cell.Rune == char {
+			cell.HeightLevel = heightLevel
+		}
 	}
 
 }
