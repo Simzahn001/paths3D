@@ -15,9 +15,9 @@ Configuration is planned ;)
 ## Fork Status
 | Feature                                                                               |     State       |
 |---------------------------------------------------------------------------------------|:---------------:|
-| **Height Pathfinding**<br>The basic height be dropped <br>down on a path configurable |    Finished     |
+| **Height Pathfinding**<br>Add pathfinding with heiht levels                           |    Finished     |
 | **Step Heights**<br>Make the height that can be stepped up configurable               |    Finished     |
-| **Drop Heights**<br>Make the height that  stepped<br>up at once configurable          |    Planned      |
+| **Drop Heights**<br>Make the height that can be dropped down at once configurable     |    Planned      |
 
 
 ## Why did you create paths3D?
