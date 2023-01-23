@@ -411,8 +411,8 @@ func (m *Grid) SetCost(char rune, cost float64) {
 
 // GetPathFromCells returns a Path, from the starting Cell to the destination Cell. diagonals controls whether moving diagonally
 // is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls that are
-// positioned diagonally.
-func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wallsBlockDiagonals bool) *Path {
+// positioned diagonally. If stepHeight and/or dropHeight are negative, they will not be used in the calculation -> infinite drop and/or step height
+func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight, dropHeight int, diagonals, wallsBlockDiagonals bool) *Path {
 
 	openNodes := minHeap{}
 	heap.Push(&openNodes, &Node{Cell: dest, Cost: dest.Cost})
@@ -428,6 +428,52 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 		}
 		return false
 
+	}
+
+	// returns if the cell is valid as next cell of the path.
+	// NOTE: "from" and "to" are not in direction of the final path. If you're looking at the whole path at the end, "to"
+	// will come before "from" because the path is constructed backwards (from end to start)
+	isCellValid := func(from, to *Node) bool {
+
+		//check if the cell is walkable
+		if !to.Cell.Walkable {
+			return false
+		}
+		//that the cell is not added a second time to the heap
+		if hasBeenAdded(to.Cell) {
+			return false
+		}
+		heightDifference := from.Cell.HeightLevel - to.Cell.HeightLevel
+		//check if the step height is not exceeded
+		if heightDifference > 0 && heightDifference > stepHeight {
+			return false
+		}
+		//check if the drop height is not exceeded
+		if heightDifference < 0 && int(math.Abs(float64(heightDifference))) > dropHeight {
+			return false
+		}
+
+		return true
+	}
+
+	areDiagonalsValid := func(node *Node, diagonal1, diagonal2 *Cell) bool {
+
+		//check if both of the diagonals are not walkable
+		if wallsBlockDiagonals {
+			if (diagonal2.Walkable == false) && (diagonal1.Walkable == false) {
+				return false
+			}
+		}
+
+		//check if both of the diagonals are too high to step on
+		heightDifference1 := diagonal1.HeightLevel - node.Cell.HeightLevel
+		heightDifference2 := diagonal2.HeightLevel - node.Cell.HeightLevel
+
+		if (heightDifference1 > stepHeight) && (heightDifference2 > stepHeight) {
+			return false
+		}
+
+		return true
 	}
 
 	path := &Path{StepHeight: stepHeight}
@@ -466,7 +512,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 		if node.Cell.X > 0 {
 			c := m.Get(node.Cell.X-1, node.Cell.Y)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+			if isCellValid(node, n) {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -474,7 +520,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 		if node.Cell.X < m.Width()-1 {
 			c := m.Get(node.Cell.X+1, node.Cell.Y)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+			if isCellValid(node, n) {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -483,7 +529,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 		if node.Cell.Y > 0 {
 			c := m.Get(node.Cell.X, node.Cell.Y-1)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+			if isCellValid(node, n) {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -491,7 +537,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 		if node.Cell.Y < m.Height()-1 {
 			c := m.Get(node.Cell.X, node.Cell.Y+1)
 			n := &Node{c, node, c.Cost + node.Cost}
-			if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+			if isCellValid(node, n) {
 				heap.Push(&openNodes, n)
 				checkedNodes = append(checkedNodes, n.Cell)
 			}
@@ -502,15 +548,15 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 
 			diagonalCost := .414 // Diagonal movement is slightly slower, so we should prioritize straightaways if possible
 
-			up := m.Get(node.Cell.X, node.Cell.Y-1).Walkable
-			down := m.Get(node.Cell.X, node.Cell.Y+1).Walkable
-			left := m.Get(node.Cell.X-1, node.Cell.Y).Walkable
-			right := m.Get(node.Cell.X+1, node.Cell.Y).Walkable
+			up := m.Get(node.Cell.X, node.Cell.Y-1)
+			down := m.Get(node.Cell.X, node.Cell.Y+1)
+			left := m.Get(node.Cell.X-1, node.Cell.Y)
+			right := m.Get(node.Cell.X+1, node.Cell.Y)
 
 			if node.Cell.X > 0 && node.Cell.Y > 0 {
 				c := m.Get(node.Cell.X-1, node.Cell.Y-1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && up)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+				if isCellValid(node, n) && areDiagonalsValid(node, left, up) {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -519,7 +565,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 			if node.Cell.X < m.Width()-1 && node.Cell.Y > 0 {
 				c := m.Get(node.Cell.X+1, node.Cell.Y-1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && up)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+				if isCellValid(node, n) && areDiagonalsValid(node, right, up) {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -528,7 +574,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 			if node.Cell.X > 0 && node.Cell.Y < m.Height()-1 {
 				c := m.Get(node.Cell.X-1, node.Cell.Y+1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (left && down)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+				if isCellValid(node, n) && areDiagonalsValid(node, left, down) {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -537,7 +583,7 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 			if node.Cell.X < m.Width()-1 && node.Cell.Y < m.Height()-1 {
 				c := m.Get(node.Cell.X+1, node.Cell.Y+1)
 				n := &Node{c, node, c.Cost + node.Cost + diagonalCost}
-				if n.Cell.Walkable && !hasBeenAdded(n.Cell) && (!wallsBlockDiagonals || (right && down)) && (node.Cell.HeightLevel-n.Cell.HeightLevel) <= stepHeight {
+				if isCellValid(node, n) && areDiagonalsValid(node, right, down) {
 					heap.Push(&openNodes, n)
 					checkedNodes = append(checkedNodes, n.Cell)
 				}
@@ -554,13 +600,13 @@ func (m *Grid) GetPathFromCells(start, dest *Cell, stepHeight int, diagonals, wa
 // GetPath returns a Path, from the starting cell's X and Y to the ending cell's X and Y. diagonals controls whether
 // moving diagonally is acceptable when creating the Path. wallsBlockDiagonals indicates whether to allow diagonal movement "through" walls
 // that are positioned diagonally. This is essentially just a smoother way to get a Path from GetPathFromCells().
-func (m *Grid) GetPath(startX, startY, endX, endY float64, stepHeight int, diagonals bool, wallsBlockDiagonals bool) *Path {
+func (m *Grid) GetPath(startX, startY, endX, endY float64, stepHeight, dropHeight int, diagonals, wallsBlockDiagonals bool) *Path {
 
 	sc := m.Get(int(startX), int(startY))
 	ec := m.Get(int(endX), int(endY))
 
 	if sc != nil && ec != nil {
-		return m.GetPathFromCells(sc, ec, stepHeight, diagonals, wallsBlockDiagonals)
+		return m.GetPathFromCells(sc, ec, stepHeight, dropHeight, diagonals, wallsBlockDiagonals)
 	}
 	return nil
 }
