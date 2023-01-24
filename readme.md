@@ -61,7 +61,7 @@ func Init() {
         "xg ggx x x",
         "xxxxxxxxxx",
     }
-    grid := paths.NewGridFromStringArrays(layout, 1, 1)
+    grid := paths.NewGridFromStringArrays(layout)
 
     // After creating the Grid, you can edit it using the Grid's functions. In this case, we make the
 	// cells to "walls". Note that here, we're using 'x' to get Cells that have the rune for the lowercase
@@ -73,9 +73,10 @@ func Init() {
         goop.Cost = 5
     }
 
-    // This gets a new Path from the Cell occupied by a starting position [24, 21], to another [99, 78]. The last boolean argument,
-    // false, indicates whether moving diagonally is fine when creating the Path.
-	grid := GameMap.GetPathFromCell(GameMap.Get(1, 1), GameMap.Get(6, 3), false, false)
+    // This gets a new Path from the Cell occupied by a starting position [24, 21], to another [99, 78]. The next two Parameters
+	// specify the maximum height that can be stepped up at once and the maximum height that can be dropped down at once.
+	// The last two parameters are settings for diagonal movement between two cells.
+    grid := GameMap.GetPathFromCell(GameMap.Get(1, 1), GameMap.Get(6, 3), 1, 5 false, false)
 
     // After that, you can use Path.Current() and Path.Next() to get the current and next Cells on the Path. When you determine that 
     // the pathfinding agent has reached that Cell, you can kick the Path forward with path.Advance().

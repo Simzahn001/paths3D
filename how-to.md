@@ -8,7 +8,7 @@ To start of, we have to create a grid. There are several ways of creating a grid
   In this case `x=10` and `y=10`.
 
     ```go
-    var grid = NewGrid(10,10,1,1)
+    var grid = NewGrid(10,10)
     ```
 
 - **Create a grid from a string array, which gives the gird a layout:**
@@ -24,7 +24,7 @@ To start of, we have to create a grid. There are several ways of creating a grid
         "acctuvwj",
         "abdefghi",
   }
-    var grid = NewGridFromStringArray(layout, 1, 1)
+    var grid = NewGridFromStringArray(layout)
     ```    
 
 ## 2. Edit parameters
@@ -86,14 +86,60 @@ The last step of creating the path itself is pretty straight-forward. Simply cal
 cell to start from and to cell to go to:
 
 ```go
-grid.GetPathFromCells(grid.Get(1,1), grid.Get(3,5), false, false)
+grid.GetPathFromCells(grid.Get(1,1), grid.Get(3,5), 1, 5 false, false)
 ```
 
 <br>
 
 The tow additional parameters do set some limitations to the pathfinding:
 
-1. **Diagonals**
+1. **Step Height**
+    
+    This is the maximal height the path can step up in one move (between two cells next to each other). Set it two a
+    negative number to make the step height infinite.
+
+    <br>
+
+    In the first example, no path can be created, because the step is too high. In the second example, a path can be created.
+    The letters do represent the hight level (`a=0` | `c=2`) of the cell.
+
+    ```go
+    /*
+    The grid:
+      +-----+
+      |aaccc|
+      +-----+
+    */
+    //This won't create a path
+    grid.GetPath(grid.Get(0,0), grid.Get(0,4), 1, -1, false, false)
+    //This will work
+    grid.GetPath(grid.Get(0,0), grid.Get(0,4), 2, -1, false, false)
+    ```
+
+2. **Drop Height**
+
+   This is the maximal height the path can drop up in one move (between two cells next to each other). Set it two a
+   negative number to make the drop height infinite.
+
+    <br>
+
+   In the first example, no path can be created, because the step is too low. In the second example, a path can be created.
+   The letters do represent the hight level (`a=0` | `c=2`) of the cell.
+
+    ```go
+    /*
+    The grid:
+      +-----+
+      |cccaa|
+      +-----+
+    */
+    //This won't create a path
+    grid.GetPath(grid.Get(0,0), grid.Get(0,4), 1, 1, false, false)
+    //This will work
+    grid.GetPath(grid.Get(0,0), grid.Get(0,4), 1, 3, false, false)
+    ```    
+
+3. **Diagonals**
 
     If this parameter is set to true, diagonal movements will be allowed.
 
@@ -112,9 +158,8 @@ The tow additional parameters do set some limitations to the pathfinding:
       |#....|     |#....|
       +-----+     +-----+
     ```
-    <br>
 
-2. **Wall blocks diagonals**
+4. **Wall blocks diagonals**
     
    If this parameter is set to true, diagonal movements will be able "trough" walls. If diagonals is disabled,
    this setting doesn't have any impact.
