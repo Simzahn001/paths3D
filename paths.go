@@ -611,6 +611,20 @@ func (m *Grid) GetPath(startX, startY, endX, endY float64, stepHeight, dropHeigh
 	return nil
 }
 
+// GetPathFromSettings returns a Path, from the starting Cell to the ending Cell. The starting and ending Cells as well as
+// the other parameters (stepHeight, dropHeight, diagonals, wallsBlockDiagonals) are read from the passed PathSettings
+// object.
+func (m *Grid) GetPathFromSettings(settings PathSettings) *Path {
+	return m.GetPathFromCells(
+		settings.start,
+		settings.end,
+		settings.stepHeight,
+		settings.dropHeight,
+		settings.diagonals,
+		settings.wallBlocksDiagonals,
+	)
+}
+
 // DataAsStringArray returns a 2D array of runes for each Cell in the Grid. The first axis is the Y axis.
 func (m *Grid) DataAsStringArray() []string {
 
@@ -779,6 +793,40 @@ func (p *Path) IsAtStart() bool {
 // IsAtEnd returns if the Path's current index is the last Cell in the Path.
 func (p *Path) IsAtEnd() bool {
 	return p.CurrentIndex >= len(p.Cells)-1
+}
+
+// PathSettings represents the settings used when finding a path. See [Grid.GetPath] for more information on each setting.
+// Create a path with [Grid.GetPathFromSettings].
+type PathSettings struct {
+	// start and end are the start and end Cells of the path.
+	start, end *Cell
+	// stepHeight is the maximum height difference between two Cells that can be stepped up or down.
+	stepHeight int
+	// dropHeight is the maximum height difference between two Cells that can be dropped down.
+	dropHeight int
+	// diagonals setting defines whether diagonal movement is allowed.
+	diagonals bool
+	// If this parameter is set to true, diagonal movements will be able "trough" walls. If diagonals is disabled, this
+	// setting doesn't have any impact.
+	wallBlocksDiagonals bool
+}
+
+// NewDefaultPathSettings returns a new PathSettings struct with default values.
+//
+// Default values:
+//   - StepHeight: 1
+//   - DropHeight: 1
+//   - Diagonals: true
+//   - WallBlocksDiagonals: true
+func NewDefaultPathSettings(startCell, endCell *Cell) *PathSettings {
+	return &PathSettings{
+		start:               startCell,
+		end:                 endCell,
+		stepHeight:          1,
+		dropHeight:          1,
+		diagonals:           true,
+		wallBlocksDiagonals: true,
+	}
 }
 
 // Node represents the node a path, it contains the cell it represents.
